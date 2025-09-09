@@ -4,9 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import Logo from "@/components/Logo";
@@ -58,9 +56,11 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <Button type="submit" className="btn btn-primary w-full text-lg">
-                  Sign in
-                </Button>
+                <Link href="/dashboard">
+                  <Button type="submit" className="btn btn-primary w-full text-lg">
+                    Sign in
+                  </Button>
+                </Link>
               </div>
             </form>
             <div className="text-center text-sm text-gray-600 mt-6">
