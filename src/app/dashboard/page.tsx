@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
 
 // Define interfaces for our data structures for type safety
 interface JobFile {
@@ -28,7 +28,13 @@ interface JobFile {
   jfn: string;
   sh: string;
   co: string;
-  // Add other job file properties as needed
+  or?: string;
+  de?: string;
+  ca?: string;
+  mawb?: string;
+  in?: string;
+  dsc?: string;
+  gw?: string;
 }
 
 interface Driver {
@@ -57,6 +63,11 @@ export default function DashboardPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // New state for job file search
+  const [jobSearchTerm, setJobSearchTerm] = useState("");
+  const [jobSuggestions, setJobSuggestions] = useState<JobFile[]>([]);
+  const [selectedJob, setSelectedJob] = useState<JobFile | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -69,6 +80,11 @@ export default function DashboardPage() {
           .map(doc => ({ id: doc.id, ...doc.data() }))
           .filter(user => user.role === 'driver' && user.status === 'active') as Driver[];
         setDrivers(activeDrivers);
+        
+        // Fetch job files for search
+        const jobFilesSnapshot = await getDocs(collection(db, "jobfiles"));
+        const jobFilesData = jobFilesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as JobFile[];
+        setJobFiles(jobFilesData);
 
         // Listen for deliveries
         const deliveriesCollection = collection(db, 'deliveries');
@@ -90,6 +106,93 @@ export default function DashboardPage() {
       fetchData();
     }
   }, [view]);
+
+  // Handle Job File Search
+  const handleJobSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const term = e.target.value;
+    setJobSearchTerm(term);
+    if (term.length > 1) {
+      const filtered = jobFiles.filter(job => 
+        (job.jfn && job.jfn.toLowerCase().includes(term.toLowerCase())) ||
+        (job.sh && job.sh.toLowerCase().includes(term.toLowerCase())) ||
+        (job.co && job.co.toLowerCase().includes(term.toLowerCase()))
+      ).slice(0, 10);
+      setJobSuggestions(filtered);
+    } else {
+      setJobSuggestions([]);
+    }
+  }
+
+  const selectJobSuggestion = (job: JobFile) => {
+    setSelectedJob(job);
+    setJobSearchTerm(job.jfn);
+    setJobSuggestions([]);
+  }
+  
+  const handleAssignDelivery = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedJob) {
+        alert("Please select a job file first.");
+        return;
+    }
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const driverId = formData.get('driver-select') as string;
+    const location = formData.get('delivery-location') as string;
+    
+    if (!driverId || !location) {
+        alert("Please select a driver and enter a location.");
+        return;
+    }
+
+    const existingDelivery = deliveries.find(d => d.jobFileId === selectedJob.id);
+    if (existingDelivery) {
+        alert(`A delivery for Job File "${selectedJob.jfn}" has already been assigned.`);
+        return;
+    }
+
+    setLoading(true);
+    try {
+        const driver = drivers.find(d => d.id === driverId);
+        if (!driver) throw new Error("Selected driver not found.");
+
+        const deliveryData = {
+            jobFileId: selectedJob.id,
+            jobFileData: {
+                jfn: selectedJob.jfn || 'N/A',
+                sh: selectedJob.sh || 'N/A',
+                co: selectedJob.co || 'N/A',
+                dsc: selectedJob.dsc || 'N/A',
+                gw: selectedJob.gw || 'N/A',
+                mawb: formData.get('delivery-mawb') as string || selectedJob.mawb || 'N/A',
+                or: formData.get('delivery-origin') as string || selectedJob.or || 'N/A', 
+                de: formData.get('delivery-destination') as string || selectedJob.de || 'N/A',
+                ca: formData.get('delivery-airlines') as string || selectedJob.ca || 'N/A',
+                in: formData.get('delivery-inv') as string || selectedJob.in || 'N/A',
+            },
+            deliveryLocation: location,
+            deliveryNotes: formData.get('additional-notes') as string,
+            driverUid: driver.id,
+            driverName: driver.displayName,
+            status: 'Pending',
+            createdAt: serverTimestamp(),
+        };
+
+        await addDoc(collection(db, 'deliveries'), deliveryData);
+        
+        alert("Delivery assigned successfully!");
+        form.reset();
+        setSelectedJob(null);
+        setJobSearchTerm("");
+
+    } catch (error) {
+        console.error("Error assigning delivery:", error);
+        alert("Could not assign delivery. Check Firestore permissions.");
+    } finally {
+        setLoading(false);
+    }
+  }
 
 
   const pendingDeliveries = deliveries.filter(d => d.status !== 'Delivered');
@@ -141,51 +244,70 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 <div className="relative">
                   <label htmlFor="job-file-search" className="block text-sm font-medium text-gray-700 mb-1">Search Job File</label>
-                  <Input type="text" id="job-file-search" placeholder="Job No, Shipper, or Consignee..." />
-                  {/* Suggestions would go here */}
+                  <Input 
+                    type="text" 
+                    id="job-file-search" 
+                    placeholder="Job No, Shipper, or Consignee..." 
+                    value={jobSearchTerm}
+                    onChange={handleJobSearch}
+                    autoComplete="off"
+                  />
+                  {jobSuggestions.length > 0 && (
+                    <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md mt-1 max-h-60 overflow-auto">
+                        {jobSuggestions.map(job => (
+                            <div 
+                                key={job.id} 
+                                className="p-2 hover:bg-gray-100 cursor-pointer"
+                                onClick={() => selectJobSuggestion(job)}
+                            >
+                                {job.jfn} - {job.sh}
+                            </div>
+                        ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Job Details</label>
                   <div className="p-3 bg-gray-50 rounded-md text-sm border">
-                    <p><strong>Job No:</strong> <span id="form-job-file-no">Select a job</span></p>
-                    <p><strong>Details:</strong> <span id="form-job-shipper-consignee">N/A</span></p>
+                    <p><strong>Job No:</strong> <span id="form-job-file-no">{selectedJob?.jfn || "Select a job"}</span></p>
+                    <p><strong>Details:</strong> <span id="form-job-shipper-consignee">{selectedJob ? `${selectedJob.sh} / ${selectedJob.co}` : "N/A"}</span></p>
                   </div>
                 </div>
               </div>
-              <form className="space-y-4">
+              <form className="space-y-4" onSubmit={handleAssignDelivery}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="delivery-origin" className="block text-sm font-medium text-gray-700 mb-1">Country of Origin</label>
-                    <Input type="text" id="delivery-origin" placeholder="Auto-filled from Job" />
+                    <Input type="text" id="delivery-origin" name="delivery-origin" placeholder="Auto-filled from Job" defaultValue={selectedJob?.or || ''} />
                   </div>
                   <div>
                     <label htmlFor="delivery-destination" className="block text-sm font-medium text-gray-700 mb-1">Destination</label>
-                    <Input type="text" id="delivery-destination" placeholder="Auto-filled from Job" />
+                    <Input type="text" id="delivery-destination" name="delivery-destination" placeholder="Auto-filled from Job" defaultValue={selectedJob?.de || ''} />
                   </div>
                   <div>
                     <label htmlFor="delivery-airlines" className="block text-sm font-medium text-gray-700 mb-1">Airlines</label>
-                    <Input type="text" id="delivery-airlines" placeholder="Auto-filled from Job" />
+                    <Input type="text" id="delivery-airlines" name="delivery-airlines" placeholder="Auto-filled from Job" defaultValue={selectedJob?.ca || ''} />
                   </div>
                   <div>
                     <label htmlFor="delivery-mawb" className="block text-sm font-medium text-gray-700 mb-1">AWB / MAWB</label>
-                    <Input type="text" id="delivery-mawb" placeholder="Auto-filled from Job" />
+                    <Input type="text" id="delivery-mawb" name="delivery-mawb" placeholder="Auto-filled from Job" defaultValue={selectedJob?.mawb || ''} />
                   </div>
                   <div className="col-span-1 sm:col-span-2">
                     <label htmlFor="delivery-inv" className="block text-sm font-medium text-gray-700 mb-1">Invoice No.</label>
-                    <Input type="text" id="delivery-inv" placeholder="Auto-filled from Job" />
+                    <Input type="text" id="delivery-inv" name="delivery-inv" placeholder="Auto-filled from Job" defaultValue={selectedJob?.in || ''} />
                   </div>
                 </div>
                 <div>
                   <label htmlFor="delivery-location" className="block text-sm font-medium text-gray-700 mb-1">Delivery Location</label>
-                  <Textarea id="delivery-location" placeholder="Enter the full delivery address" />
+                  <Textarea id="delivery-location" name="delivery-location" placeholder="Enter the full delivery address" required />
                 </div>
                 <div>
                   <label htmlFor="additional-notes" className="block text-sm font-medium text-gray-700 mb-1">Additional Notes (Optional)</label>
-                  <Textarea id="additional-notes" placeholder="e.g., Contact person, delivery instructions" />
+                  <Textarea id="additional-notes" name="additional-notes" placeholder="e.g., Contact person, delivery instructions" />
                 </div>
                 <div>
                   <label htmlFor="driver-select" className="block text-sm font-medium text-gray-700 mb-1">Assign Driver</label>
-                  <Select>
+                  <Select name="driver-select" required>
                     <SelectTrigger id="driver-select">
                       <SelectValue placeholder="-- Select a Driver --" />
                     </SelectTrigger>
@@ -197,7 +319,7 @@ export default function DashboardPage() {
                   </Select>
                 </div>
                 <div className="text-right">
-                  <Button type="submit">Assign Delivery</Button>
+                  <Button type="submit" disabled={loading || !selectedJob}>Assign Delivery</Button>
                 </div>
               </form>
             </div>
