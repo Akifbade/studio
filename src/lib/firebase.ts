@@ -1,6 +1,6 @@
 'use client';
 
-import { initializeApp, getApps } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
@@ -14,12 +14,8 @@ const firebaseConfig = {
     measurementId: "G-8EHX5K7YHL"
 };
 
-// Initialize Firebase
-let app;
-if (!getApps().length) {  
-  app = initializeApp(firebaseConfig);
-}
-
+// Initialize Firebase for SSR and SSG, prevent re-initializing on client
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
 
