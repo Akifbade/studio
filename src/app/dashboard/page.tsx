@@ -1,9 +1,9 @@
+
 "use client";
 
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -17,14 +17,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useSearchParams } from "next/navigation";
 
 export default function DashboardPage() {
-  const currentUser = { role: "admin" }; // Mock user for now
+  const searchParams = useSearchParams();
+  const view = searchParams.get('view') || 'admin';
 
   return (
     <div className="space-y-12">
       {/* Admin / Staff View */}
-      <div style={{ display: currentUser.role !== 'driver' ? 'block' : 'none' }}>
+      <div style={{ display: view === 'admin' ? 'block' : 'none' }}>
         <section id="dashboard-section" className="space-y-6">
           {/* Stat Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -162,7 +164,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Driver View */}
-      <div style={{ display: currentUser.role === 'driver' ? 'block' : 'none' }}>
+      <div style={{ display: view === 'driver' ? 'block' : 'none' }}>
         <section className="bg-white p-4 sm:p-6 rounded-xl shadow-md">
           <CardHeader className="p-0 mb-6 pb-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center">
             <CardTitle className="text-2xl font-bold text-gray-800">My Dashboard</CardTitle>
