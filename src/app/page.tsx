@@ -9,8 +9,38 @@ import {
 import { Input } from "@/components/ui/input";
 import Logo from "@/components/Logo";
 import Link from "next/link";
+import { useState } from "react";
+import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: "Please check your email and password.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
       <div className="max-w-md w-full space-y-8">
@@ -25,7 +55,7 @@ export default function LoginPage() {
             {/* The form will be inside the content for better spacing */}
           </CardHeader>
           <CardContent className="p-0">
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={handleSignIn}>
               <div>
                 <Input
                   id="email-address"
@@ -35,6 +65,9 @@ export default function LoginPage() {
                   required
                   placeholder="Email address"
                   className="input-field"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
                 />
               </div>
               <div>
@@ -46,6 +79,9 @@ export default function LoginPage() {
                   required
                   placeholder="Password"
                   className="input-field"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
                 />
               </div>
 
@@ -56,11 +92,9 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <Link href="/dashboard">
-                  <Button type="submit" className="btn btn-primary w-full text-lg">
-                    Sign in
-                  </Button>
-                </Link>
+                <Button type="submit" className="btn btn-primary w-full text-lg" disabled={loading}>
+                  {loading ? 'Signing in...' : 'Sign in'}
+                </Button>
               </div>
             </form>
             <div className="text-center text-sm text-gray-600 mt-6">

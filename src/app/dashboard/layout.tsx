@@ -4,23 +4,72 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useSearchParams, usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from "react";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+
+interface AppUser extends User {
+    role?: string;
+}
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const currentUser = { displayName: "Admin User", role: "admin" }; // Mock user for now
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
   
   const view = searchParams.get('view') || 'admin';
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+            setUser({ ...firebaseUser, ...userDoc.data() });
+        } else {
+            // Handle case where user exists in Auth but not Firestore
+            setUser(firebaseUser);
+        }
+      } else {
+        setUser(null);
+        router.push('/');
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+
   const setView = (newView: 'admin' | 'driver') => {
     const params = new URLSearchParams(searchParams);
     params.set('view', newView);
     router.push(`${pathname}?${params.toString()}`);
+  }
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.push('/');
+  }
+
+  if (loading) {
+    return (
+        <div className="flex items-center justify-center min-h-screen">
+            <div className="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-32 w-32"></div>
+        </div>
+    );
+  }
+
+  if (!user) {
+    // This state should ideally not be visible as the useEffect redirects.
+    return null;
   }
 
   return (
@@ -33,13 +82,11 @@ export default function DashboardLayout({
             </p>
         </div>
         <div className="text-sm mt-4 sm:mt-0 text-right">
-          <p className="font-medium">Welcome, <span id="user-display-name" className="font-bold text-gray-800">{currentUser.displayName}</span> (<span id="user-role" className="capitalize text-gray-600">{currentUser.role}</span>)</p>
+          <p className="font-medium">Welcome, <span id="user-display-name" className="font-bold text-gray-800">{user.displayName || user.email}</span> (<span id="user-role" className="capitalize text-gray-600">{user.role || 'User'}</span>)</p>
           <div className="flex items-center justify-end gap-4 mt-2">
             <Button variant="outline" size="sm" className="text-xs" onClick={() => setView('driver')} disabled={view === 'driver'}>Driver Dashboard</Button>
             <Button variant="default" size="sm" className="text-xs" onClick={() => setView('admin')} disabled={view === 'admin'}>Admin Panel</Button>
-            <Link href="/">
-              <Button variant="secondary" size="sm" className="text-xs">Logout</Button>
-            </Link>
+            <Button variant="secondary" size="sm" className="text-xs" onClick={handleLogout}>Logout</Button>
           </div>
         </div>
       </header>
