@@ -19,9 +19,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { collection, getDocs, onSnapshot, addDoc, serverTimestamp, query, where } from "firebase/firestore";
 import { Badge } from "@/components/ui/badge";
+import { useAuthState } from "react-firebase-hooks/auth";
 
 // Define interfaces for our data structures for type safety
 interface JobFile {
@@ -51,10 +52,12 @@ interface Delivery {
     sh?: string;
     co?: string;
   };
+  driverUid?: string;
   driverName?: string;
   receiverName?: string;
   completedAt?: { toDate: () => Date };
   jobFileId?: string;
+  deliveryLocation?: string;
   // Add other delivery properties as needed
 }
 
@@ -64,7 +67,9 @@ export default function DashboardPage() {
   const [jobFiles, setJobFiles] = useState<JobFile[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [driverDeliveries, setDriverDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user] = useAuthState(auth);
   
   // New state for job file search
   const [jobSearchTerm, setJobSearchTerm] = useState("");
@@ -72,7 +77,7 @@ export default function DashboardPage() {
   const [selectedJob, setSelectedJob] = useState<JobFile | null>(null);
 
   useEffect(() => {
-    async function fetchData() {
+    async function fetchAdminData() {
       setLoading(true);
       try {
         // Fetch drivers
@@ -88,7 +93,7 @@ export default function DashboardPage() {
         const jobFilesData = jobFilesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as JobFile[];
         setJobFiles(jobFilesData);
 
-        // Listen for deliveries
+        // Listen for all deliveries (admin view)
         const deliveriesCollection = collection(db, 'deliveries');
         const unsubscribe = onSnapshot(deliveriesCollection, (snapshot) => {
           const deliveriesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Delivery[];
@@ -99,15 +104,35 @@ export default function DashboardPage() {
         // Cleanup subscription on unmount
         return () => unsubscribe();
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching admin data:", error);
         setLoading(false);
       }
     }
 
     if (view === 'admin') {
-      fetchData();
+      fetchAdminData();
     }
   }, [view]);
+
+  useEffect(() => {
+    // Fetch data for driver view
+    if (view === 'driver' && user) {
+        setLoading(true);
+        const deliveriesQuery = query(collection(db, 'deliveries'), where('driverUid', '==', user.uid));
+        
+        const unsubscribe = onSnapshot(deliveriesQuery, (snapshot) => {
+            const driverDeliveriesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Delivery[];
+            setDriverDeliveries(driverDeliveriesData);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching driver deliveries:", error);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }
+  }, [view, user]);
+
 
   // Handle Job File Search
   const handleJobSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -405,7 +430,29 @@ export default function DashboardPage() {
             </div>
             <h3 className="text-xl font-bold text-gray-800 mb-4">My Assigned Deliveries</h3>
             <div id="driver-tasks-list" className="space-y-4">
-              <p className="text-gray-500">You have no assigned deliveries.</p>
+              {loading && <p>Loading deliveries...</p>}
+              {!loading && driverDeliveries.length === 0 && (
+                <p className="text-gray-500">You have no assigned deliveries.</p>
+              )}
+              {!loading && driverDeliveries.map(delivery => (
+                  <div key={delivery.id} className="border p-4 rounded-lg bg-gray-50 shadow-sm">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                        <div className="mb-3 sm:mb-0">
+                            <p className="font-bold text-lg text-gray-800">{delivery.jobFileData?.jfn || 'Unknown Job'}</p>
+                            <p className="text-sm text-gray-600">To: {delivery.jobFileData?.co || 'N/A'}</p>
+                            <p className="text-sm text-gray-500 mt-1">Location: <strong>{delivery.deliveryLocation || 'N/A'}</strong></p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <Badge className={delivery.status === 'Delivered' ? 'bg-green-600' : 'bg-yellow-500'}>
+                                {delivery.status}
+                            </Badge>
+                            <Button variant="default" size="sm">
+                                {delivery.status === 'Delivered' ? 'View POD' : 'Complete'}
+                            </Button>
+                        </div>
+                    </div>
+                  </div>
+              ))}
             </div>
           </CardContent>
         </section>
