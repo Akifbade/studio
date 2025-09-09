@@ -1,58 +1,79 @@
 "use client";
 
-import { trackShipment } from "@/lib/actions";
-import { useFormState } from "react-dom";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowRight, Search } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import Logo from "@/components/Logo";
+import Link from "next/link";
 
-export default function Home() {
-  const [state, formAction] = useFormState(trackShipment, null);
-
+export default function LoginPage() {
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <header className="p-4 flex items-center justify-between">
-        <Logo />
-      </header>
-      <main className="flex-grow flex items-center justify-center p-4 sm:p-6">
-        <div className="w-full max-w-md space-y-8">
-          <div className="text-center">
-            <h1 className="text-4xl sm:text-5xl font-bold font-headline text-primary">QGO Cargo</h1>
-            <p className="mt-2 text-lg text-muted-foreground">Your trusted delivery partner.</p>
-          </div>
-          <Card className="shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-2xl font-headline">Track Your Shipment</CardTitle>
-              <CardDescription>Enter your tracking number (POD token) to see the latest updates.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form action={formAction} className="space-y-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input 
-                    name="token"
-                    id="token"
-                    placeholder="e.g., AWB123456789" 
-                    className="pl-10 h-12 text-lg" 
-                    required 
-                    aria-label="Tracking Number"
-                  />
-                </div>
-                <Button type="submit" className="w-full h-12 text-lg">
-                  Track
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-                {state?.error && <p className="text-sm font-medium text-destructive">{state.error}</p>}
-              </form>
-            </CardContent>
-          </Card>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <Logo />
+          <h2 className="mt-4 text-center text-2xl font-bold text-gray-700">
+            Delivery Management Portal
+          </h2>
         </div>
-      </main>
-      <footer className="p-4 text-center text-xs text-muted-foreground">
-        &copy; {new Date().getFullYear()} QGO Cargo. All rights reserved.
-      </footer>
+        <Card className="mt-8 space-y-6 bg-white p-8 rounded-xl shadow-lg">
+          <CardHeader className="p-0">
+            {/* The form will be inside the content for better spacing */}
+          </CardHeader>
+          <CardContent className="p-0">
+            <form className="space-y-4">
+              <div>
+                <Input
+                  id="email-address"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  placeholder="Email address"
+                  className="input-field"
+                />
+              </div>
+              <div>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  placeholder="Password"
+                  className="input-field"
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-sm">
+                <Link href="#" className="font-medium text-indigo-600 hover:text-indigo-500">
+                  Forgot your password?
+                </Link>
+              </div>
+
+              <div>
+                <Button type="submit" className="btn btn-primary w-full text-lg">
+                  Sign in
+                </Button>
+              </div>
+            </form>
+            <div className="text-center text-sm text-gray-600 mt-6">
+              <p>
+                New Driver?{' '}
+                <Link href="#" className="font-medium text-indigo-600 hover:text-indigo-500">
+                  Sign up here
+                </Link>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
