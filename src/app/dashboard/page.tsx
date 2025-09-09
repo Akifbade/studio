@@ -21,6 +21,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
+import { Badge } from "@/components/ui/badge";
 
 // Define interfaces for our data structures for type safety
 interface JobFile {
@@ -53,6 +54,7 @@ interface Delivery {
   driverName?: string;
   receiverName?: string;
   completedAt?: { toDate: () => Date };
+  jobFileId?: string;
   // Add other delivery properties as needed
 }
 
@@ -340,9 +342,16 @@ export default function DashboardPage() {
               <div id="pending-deliveries-list" className="space-y-4 max-h-96 overflow-y-auto">
                 {loading ? <p>Loading...</p> : pendingDeliveries.length > 0 ? pendingDeliveries.map(delivery => (
                   <div key={delivery.id} className="border p-3 rounded-lg bg-gray-50">
-                    <p className="font-bold">{delivery.jobFileData?.jfn || 'Unknown Job'}</p>
-                    <p className="text-sm text-gray-700">{delivery.jobFileData?.sh || 'N/A'} to {delivery.jobFileData?.co || 'N/A'}</p>
-                    <p className="text-xs text-gray-500">Assigned to: <strong>{delivery.driverName || 'N/A'}</strong></p>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-bold">{delivery.jobFileData?.jfn || 'Unknown Job'}</p>
+                        <p className="text-sm text-gray-700">{delivery.jobFileData?.sh || 'N/A'} to {delivery.jobFileData?.co || 'N/A'}</p>
+                        <p className="text-xs text-gray-500">Assigned to: <strong>{delivery.driverName || 'N/A'}</strong></p>
+                      </div>
+                       <Badge variant={delivery.status === 'Delivered' ? 'default' : 'secondary'} className={delivery.status === 'Delivered' ? 'bg-green-600' : 'bg-yellow-500'}>
+                         {delivery.status}
+                       </Badge>
+                    </div>
                   </div>
                 )) : <p className="text-gray-500 text-center py-4">No pending deliveries found.</p>}
               </div>
@@ -366,13 +375,14 @@ export default function DashboardPage() {
                         <p className="text-sm text-gray-700">{delivery.jobFileData?.sh || 'N/A'} to {delivery.jobFileData?.co || 'N/A'}</p>
                         <p className="text-xs text-gray-500">Assigned to: <strong>{delivery.driverName || 'N/A'}</strong></p>
                       </div>
-                      <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-200 text-green-800">
-                        {delivery.status}
-                      </span>
+                      <Badge variant="default" className="bg-green-600">{delivery.status}</Badge>
                     </div>
-                    <div className="mt-2 pt-2 border-t">
-                      <p className="text-xs"><strong>Receiver:</strong> {delivery.receiverName || 'N/A'}</p>
-                      <p className="text-xs"><strong>Completed:</strong> {delivery.completedAt?.toDate().toLocaleString() || 'N/A'}</p>
+                    <div className="mt-2 pt-2 border-t flex justify-between items-center">
+                        <div>
+                          <p className="text-xs"><strong>Receiver:</strong> {delivery.receiverName || 'N/A'}</p>
+                          <p className="text-xs"><strong>Completed:</strong> {delivery.completedAt?.toDate().toLocaleString() || 'N/A'}</p>
+                        </div>
+                        <Button variant="outline" size="sm">View</Button>
                     </div>
                   </div>
                 )) : <p className="text-gray-500 text-center py-4">No completed deliveries found.</p>}
@@ -403,3 +413,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
