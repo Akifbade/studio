@@ -61,6 +61,8 @@ interface Delivery {
   // Add other delivery properties as needed
 }
 
+export const dynamic = 'force-dynamic';
+
 export default function DashboardPage() {
   const searchParams = useSearchParams();
   const view = searchParams.get('view') || 'admin';
@@ -460,5 +462,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
