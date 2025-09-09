@@ -15,9 +15,6 @@ export default function Home() {
     <div className="flex flex-col min-h-screen bg-background">
       <header className="p-4 flex items-center justify-between">
         <Logo />
-        <Button variant="ghost" asChild>
-          <a href="/login">Staff Login</a>
-        </Button>
       </header>
       <main className="flex-grow flex items-center justify-center p-4 sm:p-6">
         <div className="w-full max-w-md space-y-8">
@@ -51,9 +48,6 @@ export default function Home() {
               </form>
             </CardContent>
           </Card>
-          <p className="text-center text-sm text-muted-foreground">
-            For internal access, please use the staff login.
-          </p>
         </div>
       </main>
       <footer className="p-4 text-center text-xs text-muted-foreground">
