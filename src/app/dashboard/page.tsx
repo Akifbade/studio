@@ -18,10 +18,82 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { db } from "@/lib/firebase";
+import { collection, getDocs, onSnapshot } from "firebase/firestore";
+
+// Define interfaces for our data structures for type safety
+interface JobFile {
+  id: string;
+  jfn: string;
+  sh: string;
+  co: string;
+  // Add other job file properties as needed
+}
+
+interface Driver {
+  id: string;
+  displayName: string;
+}
+
+interface Delivery {
+  id:string;
+  status: 'Pending' | 'Delivered';
+  jobFileData: {
+    jfn?: string;
+    sh?: string;
+    co?: string;
+  };
+  driverName?: string;
+  receiverName?: string;
+  completedAt?: { toDate: () => Date };
+  // Add other delivery properties as needed
+}
 
 export default function DashboardPage() {
   const searchParams = useSearchParams();
   const view = searchParams.get('view') || 'admin';
+  const [jobFiles, setJobFiles] = useState<JobFile[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      try {
+        // Fetch drivers
+        const usersCollection = collection(db, "users");
+        const usersSnapshot = await getDocs(usersCollection);
+        const activeDrivers = usersSnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(user => user.role === 'driver' && user.status === 'active') as Driver[];
+        setDrivers(activeDrivers);
+
+        // Listen for deliveries
+        const deliveriesCollection = collection(db, 'deliveries');
+        const unsubscribe = onSnapshot(deliveriesCollection, (snapshot) => {
+          const deliveriesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Delivery[];
+          setDeliveries(deliveriesData);
+          setLoading(false);
+        });
+
+        // Cleanup subscription on unmount
+        return () => unsubscribe();
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setLoading(false);
+      }
+    }
+
+    if (view === 'admin') {
+      fetchData();
+    }
+  }, [view]);
+
+
+  const pendingDeliveries = deliveries.filter(d => d.status !== 'Delivered');
+  const completedDeliveries = deliveries.filter(d => d.status === 'Delivered');
 
   return (
     <div className="space-y-12">
@@ -37,20 +109,20 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-base text-gray-500">Pending</p>
-                  <p id="stat-pending" className="text-3xl font-extrabold text-gray-800">0</p>
+                  <p id="stat-pending" className="text-3xl font-extrabold text-gray-800">{pendingDeliveries.length}</p>
                 </div>
               </CardContent>
             </Card>
             <Card className="flex items-center gap-5 border-l-4 border-green-400">
               <CardContent className="p-6 flex items-center gap-5">
                 <div className="bg-green-100 p-3 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
-                <div><p className="text-base text-gray-500">Completed</p><p id="stat-completed" className="text-3xl font-extrabold text-gray-800">0</p></div>
+                <div><p className="text-base text-gray-500">Completed</p><p id="stat-completed" className="text-3xl font-extrabold text-gray-800">{completedDeliveries.length}</p></div>
               </CardContent>
             </Card>
             <Card className="flex items-center gap-5 border-l-4 border-blue-400">
               <CardContent className="p-6 flex items-center gap-5">
                 <div className="bg-blue-100 p-3 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h8a1 1 0 001-1z" /></svg></div>
-                <div><p className="text-base text-gray-500">Total Deliveries</p><p id="stat-total" className="text-3xl font-extrabold text-gray-800">0</p></div>
+                <div><p className="text-base text-gray-500">Total Deliveries</p><p id="stat-total" className="text-3xl font-extrabold text-gray-800">{deliveries.length}</p></div>
               </CardContent>
             </Card>
           </div>
@@ -118,7 +190,9 @@ export default function DashboardPage() {
                       <SelectValue placeholder="-- Select a Driver --" />
                     </SelectTrigger>
                     <SelectContent>
-                      {/* Driver options would go here */}
+                      {drivers.map(driver => (
+                        <SelectItem key={driver.id} value={driver.id}>{driver.displayName}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -142,7 +216,13 @@ export default function DashboardPage() {
             <CardContent>
               <Input type="text" id="pending-search" placeholder="Search pending deliveries..." className="mb-4" />
               <div id="pending-deliveries-list" className="space-y-4 max-h-96 overflow-y-auto">
-                <p className="text-gray-500 text-center py-4">No pending deliveries found.</p>
+                {loading ? <p>Loading...</p> : pendingDeliveries.length > 0 ? pendingDeliveries.map(delivery => (
+                  <div key={delivery.id} className="border p-3 rounded-lg bg-gray-50">
+                    <p className="font-bold">{delivery.jobFileData?.jfn || 'Unknown Job'}</p>
+                    <p className="text-sm text-gray-700">{delivery.jobFileData?.sh || 'N/A'} to {delivery.jobFileData?.co || 'N/A'}</p>
+                    <p className="text-xs text-gray-500">Assigned to: <strong>{delivery.driverName || 'N/A'}</strong></p>
+                  </div>
+                )) : <p className="text-gray-500 text-center py-4">No pending deliveries found.</p>}
               </div>
             </CardContent>
           </Card>
@@ -156,7 +236,24 @@ export default function DashboardPage() {
             <CardContent>
               <Input type="text" id="completed-search" placeholder="Search completed deliveries..." className="mb-4" />
               <div id="completed-deliveries-list" className="space-y-4 max-h-96 overflow-y-auto">
-                <p className="text-gray-500 text-center py-4">No completed deliveries found.</p>
+                {loading ? <p>Loading...</p> : completedDeliveries.length > 0 ? completedDeliveries.map(delivery => (
+                   <div key={delivery.id} className="border p-3 rounded-lg bg-gray-50">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-bold">{delivery.jobFileData?.jfn || 'Unknown Job'}</p>
+                        <p className="text-sm text-gray-700">{delivery.jobFileData?.sh || 'N/A'} to {delivery.jobFileData?.co || 'N/A'}</p>
+                        <p className="text-xs text-gray-500">Assigned to: <strong>{delivery.driverName || 'N/A'}</strong></p>
+                      </div>
+                      <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-200 text-green-800">
+                        {delivery.status}
+                      </span>
+                    </div>
+                    <div className="mt-2 pt-2 border-t">
+                      <p className="text-xs"><strong>Receiver:</strong> {delivery.receiverName || 'N/A'}</p>
+                      <p className="text-xs"><strong>Completed:</strong> {delivery.completedAt?.toDate().toLocaleString() || 'N/A'}</p>
+                    </div>
+                  </div>
+                )) : <p className="text-gray-500 text-center py-4">No completed deliveries found.</p>}
               </div>
             </CardContent>
           </Card>
