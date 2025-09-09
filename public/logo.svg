@@ -1,0 +1,12 @@
+<svg width="120" height="40" viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g clip-path="url(#clip0_101_2)">
+    <path d="M20 40C8.95431 40 0 31.0457 0 20C0 8.95431 8.95431 0 20 0C31.0457 0 40 8.95431 40 20C40 31.0457 31.0457 40 20 40ZM20 35C28.2843 35 35 28.2843 35 20C35 11.7157 28.2843 5 20 5C11.7157 5 5 11.7157 5 20C5 28.2843 11.7157 35 20 35Z" fill="hsl(var(--primary))"/>
+    <path d="M32.0711 32.0711L37.0711 37.0711" stroke="hsl(var(--primary))" stroke-width="4" stroke-linecap="round"/>
+    <text x="48" y="28" font-family="'PT Sans', sans-serif" font-size="24" font-weight="bold" fill="hsl(var(--primary))">QGO</text>
+  </g>
+  <defs>
+    <clipPath id="clip0_101_2">
+      <rect width="120" height="40" fill="white"/>
+    </clipPath>
+  </defs>
+</svg>
